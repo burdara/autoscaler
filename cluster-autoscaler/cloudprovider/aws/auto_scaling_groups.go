@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 )
 
-const scaleToZeroSupported = false
+const scaleToZeroSupported = true
 
 type asgCache struct {
 	registeredAsgs     []*asgInformation
@@ -107,6 +107,18 @@ func (m *asgCache) get() []*asgInformation {
 	defer m.mutex.Unlock()
 
 	return m.registeredAsgs
+}
+
+for (m *asgCache) GetAsgSize(asg *Asg) (int64, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for _, existing := range m.registeredAsgs {
+		if existing.config.AwsRef == asg.AwsRef {
+			return existing.config.desiredSize
+		}
+		updated = append(updated, existing)
+	}
 }
 
 // FindForInstance returns AsgConfig of the given Instance

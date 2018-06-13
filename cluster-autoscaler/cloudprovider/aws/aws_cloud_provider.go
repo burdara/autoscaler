@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/golang/glog"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -141,8 +142,9 @@ type Asg struct {
 
 	awsManager *AwsManager
 
-	minSize int
-	maxSize int
+	minSize     int
+	maxSize     int
+	desiredSize int
 }
 
 // MaxSize returns maximum size of the node group.
@@ -155,9 +157,14 @@ func (asg *Asg) MinSize() int {
 	return asg.minSize
 }
 
+func (asg *Asg) UpdateDesiredSize(size int) {
+	asg.desiredSize = size
+}
+
 // TargetSize returns the current TARGET size of the node group. It is possible that the
 // number is different from the number of nodes registered in Kubernetes.
 func (asg *Asg) TargetSize() (int, error) {
+	glog.V(4).Infof("Calling TargetSize.GetAsgSize")
 	size, err := asg.awsManager.GetAsgSize(asg)
 	return int(size), err
 }
@@ -189,6 +196,7 @@ func (asg *Asg) IncreaseSize(delta int) error {
 	if delta <= 0 {
 		return fmt.Errorf("size increase must be positive")
 	}
+	glog.V(4).Infof("Calling IncreaseSize.GetAsgSize with delta %d", delta)
 	size, err := asg.awsManager.GetAsgSize(asg)
 	if err != nil {
 		return err
@@ -208,6 +216,7 @@ func (asg *Asg) DecreaseTargetSize(delta int) error {
 	if delta >= 0 {
 		return fmt.Errorf("size decrease size must be negative")
 	}
+	glog.V(4).Infof("Calling DecreaseTargetSize.GetAsgSize with delta %d", delta)
 	size, err := asg.awsManager.GetAsgSize(asg)
 	if err != nil {
 		return err
@@ -244,6 +253,7 @@ func (asg *Asg) Belongs(node *apiv1.Node) (bool, error) {
 
 // DeleteNodes deletes the nodes from the group.
 func (asg *Asg) DeleteNodes(nodes []*apiv1.Node) error {
+	glog.V(4).Infof("Calling DeleteNodes.GetAsgSize")
 	size, err := asg.awsManager.GetAsgSize(asg)
 	if err != nil {
 		return err

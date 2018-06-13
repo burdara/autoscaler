@@ -30,6 +30,8 @@ type NodeGroupSpec struct {
 	MinSize int `json:"minSize"`
 	// Max size of the autoscaling target
 	MaxSize int `json:"maxSize"`
+	// Desired size of the autoscaling target
+	DesiredSize int `json:"desiredSize"`
 	// Specifies whether this node group can scale to zero nodes.
 	SupportScaleToZero bool
 }
@@ -43,8 +45,8 @@ func SpecFromString(value string, SupportScaleToZero bool) (*NodeGroupSpec, erro
 
 	spec := NodeGroupSpec{SupportScaleToZero: SupportScaleToZero}
 	if size, err := strconv.Atoi(tokens[0]); err == nil {
-
 		spec.MinSize = size
+		spec.DesiredSize = size
 	} else {
 		return nil, fmt.Errorf("failed to set min size: %s, expected integer", tokens[0])
 	}

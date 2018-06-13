@@ -61,6 +61,7 @@ func (m autoScalingWrapper) getAutoscalingGroupByName(name string) (*autoscaling
 		AutoScalingGroupNames: []*string{aws.String(name)},
 		MaxRecords:            aws.Int64(1),
 	}
+	glog.V(4).Infof("Calling getAutoscalingGroupByName.DescribeAutoScalingGroups for %s", name)
 	groups, err := m.DescribeAutoScalingGroups(params)
 	if err != nil {
 		glog.V(4).Infof("Failed ASG info request for %s: %v", name, err)
@@ -80,6 +81,7 @@ func (m *autoScalingWrapper) getAutoscalingGroupsByNames(names []string) ([]*aut
 		AutoScalingGroupNames: aws.StringSlice(names),
 		MaxRecords:            aws.Int64(maxRecordsReturnedByAPI),
 	}
+	glog.V(4).Infof("Calling getAutoscalingGroupsByNames.DescribeAutoScalingGroupsPages for %v", names)
 	asgs := make([]*autoscaling.Group, 0)
 	if err := m.DescribeAutoScalingGroupsPages(input, func(output *autoscaling.DescribeAutoScalingGroupsOutput, _ bool) bool {
 		asgs = append(asgs, output.AutoScalingGroups...)

@@ -149,10 +149,11 @@ func (m *AwsManager) buildAsgFromSpec(spec string) (*Asg, error) {
 		return nil, fmt.Errorf("failed to parse node group spec: %v", err)
 	}
 	asg := &Asg{
-		awsManager: m,
-		AwsRef:     AwsRef{Name: s.Name},
-		minSize:    s.MinSize,
-		maxSize:    s.MaxSize,
+		awsManager:  m,
+		AwsRef:      AwsRef{Name: s.Name},
+		minSize:     s.MinSize,
+		maxSize:     s.MaxSize,
+		desiredSize: s.MinSize,
 	}
 	return asg, nil
 }
@@ -208,16 +209,18 @@ func (m *AwsManager) buildAsgFromAWS(g *autoscaling.Group) (*Asg, error) {
 		Name:               aws.StringValue(g.AutoScalingGroupName),
 		MinSize:            int(aws.Int64Value(g.MinSize)),
 		MaxSize:            int(aws.Int64Value(g.MaxSize)),
+		DesiredSize:        int(aws.Int64Value(g.DesiredCapacity)),
 		SupportScaleToZero: scaleToZeroSupported,
 	}
 	if verr := spec.Validate(); verr != nil {
 		return nil, fmt.Errorf("failed to create node group spec: %v", verr)
 	}
 	asg := &Asg{
-		awsManager: m,
-		AwsRef:     AwsRef{Name: spec.Name},
-		minSize:    spec.MinSize,
-		maxSize:    spec.MaxSize,
+		awsManager:  m,
+		AwsRef:      AwsRef{Name: spec.Name},
+		minSize:     spec.MinSize,
+		maxSize:     spec.MaxSize,
+		desiredSize: spec.DesiredSize,
 	}
 	return asg, nil
 }
@@ -275,23 +278,28 @@ func (m *AwsManager) getAutoscalingGroupsByTags(keys []string) ([]*autoscaling.G
 	return m.service.getAutoscalingGroupsByTags(keys)
 }
 
+// // GetAsgSize gets ASG size.
+// func (m *AwsManager) GetAsgSize(asgConfig *Asg) (int64, error) {
+// 	params := &autoscaling.DescribeAutoScalingGroupsInput{
+// 		AutoScalingGroupNames: []*string{aws.String(asgConfig.Name)},
+// 		MaxRecords:            aws.Int64(1),
+// 	}
+// 	glog.V(4).Infof("Calling GetAsgSize.DescribeAutoScalingGroups for %s", asgConfig.Name)
+// 	groups, err := m.service.DescribeAutoScalingGroups(params)
+// 	if err != nil {
+// 		return -1, err
+// 	}
+//
+// 	if len(groups.AutoScalingGroups) < 1 {
+// 		return -1, fmt.Errorf("Unable to get first autoscaling.Group for %s", asgConfig.Name)
+// 	}
+// 	asg := *groups.AutoScalingGroups[0]
+// 	return *asg.DesiredCapacity, nil
+// }
+
 // GetAsgSize gets ASG size.
 func (m *AwsManager) GetAsgSize(asgConfig *Asg) (int64, error) {
-	params := &autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: []*string{aws.String(asgConfig.Name)},
-		MaxRecords:            aws.Int64(1),
-	}
-	groups, err := m.service.DescribeAutoScalingGroups(params)
-
-	if err != nil {
-		return -1, err
-	}
-
-	if len(groups.AutoScalingGroups) < 1 {
-		return -1, fmt.Errorf("Unable to get first autoscaling.Group for %s", asgConfig.Name)
-	}
-	asg := *groups.AutoScalingGroups[0]
-	return *asg.DesiredCapacity, nil
+	return m.asgCache.GetAsgSize(asgConfig)
 }
 
 // SetAsgSize sets ASG size.
@@ -306,6 +314,7 @@ func (m *AwsManager) SetAsgSize(asg *Asg, size int64) error {
 	if err != nil {
 		return err
 	}
+	asg.UpdateDesiredSize(size)
 	return nil
 }
 
@@ -324,7 +333,7 @@ func (m *AwsManager) DeleteInstances(instances []*AwsRef) error {
 			return err
 		}
 		if asg != commonAsg {
-			return fmt.Errorf("Connot delete instances which don't belong to the same ASG.")
+			return fmt.Errorf("Cannot delete instances which don't belong to the same ASG.")
 		}
 	}
 
